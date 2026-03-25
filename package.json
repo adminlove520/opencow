@@ -3,6 +3,7 @@
   "productName": "OpenCow",
   "version": "0.3.0",
   "description": "Task-driven autonomous AI agent platform",
+  "packageManager": "pnpm@10.13.1",
   "main": "./out/main/index.js",
   "scripts": {
     "predev": "pnpm exec electron-rebuild -f -w better-sqlite3,node-pty",
