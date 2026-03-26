@@ -2,8 +2,8 @@
 
 // @vitest-environment jsdom
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, it, expect, vi } from 'vitest'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom/vitest'
 import { ComposeView } from '../../../src/renderer/components/DetailPanel/SessionPanel/ComposeView'
@@ -22,6 +22,17 @@ async function getEditor(): Promise<HTMLElement> {
 }
 
 describe('ComposeView', () => {
+  // TipTap React defers editor destruction via setTimeout. If the jsdom
+  // environment is torn down before that timer fires, an "document is not
+  // defined" error is thrown.  Flush pending timers *before* cleanup so the
+  // editor is destroyed while jsdom is still alive.
+  afterEach(() => {
+    vi.useFakeTimers()
+    vi.runAllTimers()
+    vi.useRealTimers()
+    cleanup()
+  })
+
   it('renders header and action buttons', () => {
     render(
       <ComposeView
