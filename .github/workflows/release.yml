@@ -47,15 +47,52 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
+      # ── macOS Code Signing ─────────────────────────────────────────────
+      # Import the Developer ID Application certificate into a temporary
+      # keychain so electron-builder can sign the app in CI.
+      - name: Import macOS signing certificate
+        env:
+          MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Decode the certificate from base64
+          echo -n "$MAC_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+
+          # Create a temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Import certificate into the keychain
+          security import $CERTIFICATE_PATH -P "$MAC_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # Add temporary keychain to the search list
+          security list-keychains -d user -s $KEYCHAIN_PATH
+
       # ── Build ─────────────────────────────────────────────────────────
       # Vite build (main + preload + renderer)
       - run: pnpm build
 
       # Electron Builder — produces DMG + ZIP for macOS (universal binary)
+      # With code signing and notarization enabled.
       - name: Build Electron App
         run: npx electron-builder --mac --universal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Code Signing
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          # Notarization
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       # ── Publish ───────────────────────────────────────────────────────
       # Upload only installer artifacts (DMG + ZIP). Blockmap files are

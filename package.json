@@ -138,6 +138,11 @@
     "mac": {
       "icon": "resources/icon.icns",
       "x64ArchFiles": "Contents/Resources/app.asar.unpacked/**",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "notarize": true,
       "target": [
         {
           "target": "dmg",
