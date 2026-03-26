@@ -6,6 +6,7 @@ import type {
   BrowserError,
   BrowserExecutionContext,
   ExecutorState,
+  KeyDescriptor,
   PageContent,
 } from './types'
 import type { BrowserActionDecorator } from './browserActionDecorator'
@@ -180,6 +181,63 @@ export class BrowserActionExecutor {
     this.invalidateSnapshot()
   }
 
+  // ── Text Input ──────────────────────────────────────────────────
+
+  /**
+   * Non-printable character → CDP key descriptor lookup.
+   *
+   * Chromium's `Input.dispatchKeyEvent` silently ignores the `text` field
+   * for non-printable characters; a full key descriptor (`key`, `code`,
+   * `windowsVirtualKeyCode`) is required to synthesise the correct DOM
+   * `KeyboardEvent`.  Extend this map when additional special keys are
+   * needed (e.g. Escape, Backspace).
+   */
+  private static readonly SPECIAL_KEYS: ReadonlyMap<string, KeyDescriptor> = new Map([
+    ['\n', { key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 }],
+    ['\r', { key: 'Enter', code: 'Enter', text: '\r', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 }],
+    ['\t', { key: 'Tab', code: 'Tab', text: '', windowsVirtualKeyCode: 9, nativeVirtualKeyCode: 9 }],
+  ])
+
+  /**
+   * Type a text string character-by-character via CDP key events.
+   *
+   * Shared by both `type()` (CSS-selector) and `refType()` (snapshot-ref).
+   * Callers are responsible for focusing the target element before calling
+   * this method.
+   *
+   * Implementation notes:
+   * - CRLF (`\r\n`) is normalised to a single `\n` **before** iteration
+   *   to prevent double-Enter on Windows-originated text.
+   * - Each character is dispatched as a `keyDown` + `keyUp` pair so that
+   *   per-keystroke handlers (autocomplete, live-search, etc.) fire correctly.
+   */
+  private async typeText(
+    text: string,
+    context: BrowserExecutionContext,
+  ): Promise<void> {
+    // Visual decoration: typing-glow at the current cursor position
+    this.decorator?.showType().catch(this.noop)
+
+    const normalized = text.replace(/\r\n/g, '\n')
+    for (const char of normalized) {
+      const desc: KeyDescriptor =
+        BrowserActionExecutor.SPECIAL_KEYS.get(char) ?? { text: char }
+
+      await this.cdp(
+        'Input.dispatchKeyEvent',
+        { type: 'keyDown', ...desc },
+        DEFAULT_CDP_TIMEOUT,
+        context,
+      )
+      await this.cdp(
+        'Input.dispatchKeyEvent',
+        { type: 'keyUp', ...desc },
+        DEFAULT_CDP_TIMEOUT,
+        context,
+      )
+    }
+  }
+
   // ── Element Interaction ───────────────────────────────────────────
 
   private async click(selector: string, context: BrowserExecutionContext): Promise<void> {
@@ -209,14 +267,7 @@ export class BrowserActionExecutor {
     await this.click(selector, context)
     // Small delay for focus
     await this.sleep(50, context, 'type')
-
-    // Visual decoration: typing-glow at the current cursor position
-    this.decorator?.showType().catch(this.noop)
-
-    for (const char of text) {
-      await this.cdp('Input.dispatchKeyEvent', { type: 'keyDown', text: char }, DEFAULT_CDP_TIMEOUT, context)
-      await this.cdp('Input.dispatchKeyEvent', { type: 'keyUp', text: char }, DEFAULT_CDP_TIMEOUT, context)
-    }
+    await this.typeText(text, context)
   }
 
   private async selectOption(selector: string, value: string, context: BrowserExecutionContext): Promise<void> {
@@ -486,19 +537,7 @@ export class BrowserActionExecutor {
 
     // Small delay for focus
     await this.sleep(50, context, 'ref-type')
-
-    // Visual decoration
-    this.decorator?.showType().catch(this.noop)
-
-    // Type character-by-character
-    for (const char of text) {
-      await this.cdp('Input.dispatchKeyEvent', {
-        type: 'keyDown', text: char,
-      }, DEFAULT_CDP_TIMEOUT, context)
-      await this.cdp('Input.dispatchKeyEvent', {
-        type: 'keyUp', text: char,
-      }, DEFAULT_CDP_TIMEOUT, context)
-    }
+    await this.typeText(text, context)
 
     // Auto re-snapshot
     await this.sleep(100, context, 'ref-type')
