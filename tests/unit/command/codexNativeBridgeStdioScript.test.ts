@@ -5,7 +5,9 @@ import { buildCodexNativeBridgeStdioScript } from '../../../electron/command/cod
 
 describe('buildCodexNativeBridgeStdioScript', () => {
   const modules = {
-    bridgeDepsPath: '/tmp/fake/codex-bridge-deps.cjs',
+    mcpServerModulePath: '/tmp/fake/mcp.js',
+    stdioServerTransportModulePath: '/tmp/fake/stdio.js',
+    zodModulePath: '/tmp/fake/zod.js',
   }
 
   it('contains required bridge environment variable checks and endpoints', () => {
@@ -49,11 +51,12 @@ describe('buildCodexNativeBridgeStdioScript', () => {
     expect(script).toContain('node.additionalProperties')
   })
 
-  it('pins dependencies to the pre-bundled bridge deps file (no bare imports)', () => {
+  it('pins dependencies to absolute module paths (no bare imports)', () => {
     const script = buildCodexNativeBridgeStdioScript(modules)
 
-    expect(script).toContain(`require("${modules.bridgeDepsPath}")`)
-    expect(script).toContain('McpServer, StdioServerTransport, z')
+    expect(script).toContain(`require("${modules.mcpServerModulePath}")`)
+    expect(script).toContain(`require("${modules.stdioServerTransportModulePath}")`)
+    expect(script).toContain(`require("${modules.zodModulePath}")`)
     expect(script).not.toContain(`from '@modelcontextprotocol/sdk/server/mcp.js'`)
     expect(script).not.toContain(`from 'zod/v4'`)
   })
@@ -61,17 +64,11 @@ describe('buildCodexNativeBridgeStdioScript', () => {
   it('handles additionalProperties correctly with explicit false, true, and empty object', () => {
     const script = buildCodexNativeBridgeStdioScript(modules)
 
-    // Must check for explicit false before truthy object check
     expect(script).toContain('additionalProperties === false')
-    // Must check for explicit true
     expect(script).toContain('additionalProperties === true')
-    // Must guard against empty schema object {} (JSON Schema "allow any")
     expect(script).toContain('Object.keys(node.additionalProperties)')
-    // Must use passthrough for empty object case
     expect(script).toContain('.passthrough()')
-    // Must use strict for explicit false
     expect(script).toContain('.strict()')
-    // Must use catchall for non-empty schema objects
     expect(script).toContain('.catchall(')
   })
 })

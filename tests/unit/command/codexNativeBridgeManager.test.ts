@@ -3,9 +3,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { z } from 'zod/v4'
+
+vi.mock('electron', () => ({
+  app: { isPackaged: false },
+}))
 import {
   CodexNativeBridgeManager,
-  normalizeBridgeModulePathForExternalNode,
 } from '../../../electron/command/codexNativeBridgeManager'
 import { ToolProgressRelay } from '../../../electron/utils/toolProgressRelay'
 import { MCP_SERVER_BASE_NAME } from '../../../src/shared/appIdentity'
@@ -156,10 +159,8 @@ describe('CodexNativeBridgeManager', () => {
     expect(serverConfig.args).toEqual(['/tmp/opencow-codex-native-bridge.mjs'])
   })
 
-  it('fails open when bridge command cannot be resolved', async () => {
-    const manager = new CodexNativeBridgeManager(makeRegistryStub() as never, {
-      resolveBridgeCommand: () => null,
-    })
+  it('includes required bridge env vars in MCP server config', async () => {
+    const manager = new CodexNativeBridgeManager(makeRegistryStub() as never)
     managers.push(manager)
     ;(manager as unknown as { ensureHttpServer: () => Promise<void> }).ensureHttpServer = async () => {
       ;(manager as unknown as { port: number }).port = 39013
@@ -167,14 +168,18 @@ describe('CodexNativeBridgeManager', () => {
     ;(manager as unknown as { ensureBridgeScript: () => Promise<string> }).ensureBridgeScript = async () =>
       '/tmp/opencow-codex-native-bridge.mjs'
 
-    const sessionId = 'session-bridge-no-command'
+    const sessionId = 'session-bridge-env'
     const serverConfigMap = await manager.registerSession({
       session: { sessionId, projectId: null, originSource: 'agent' },
       relay: new ToolProgressRelay(),
       nativeToolAllowlist: PROJECT_ALLOWLIST,
     })
 
-    expect(serverConfigMap).toBeUndefined()
+    expect(serverConfigMap).toBeDefined()
+    const serverConfig = serverConfigMap![MCP_SERVER_BASE_NAME]
+    expect(serverConfig.env).toHaveProperty('OPENCOW_CODEX_BRIDGE_URL')
+    expect(serverConfig.env).toHaveProperty('OPENCOW_CODEX_BRIDGE_TOKEN')
+    expect(serverConfig.env).toHaveProperty('OPENCOW_CODEX_BRIDGE_SESSION_ID')
   })
 
   it('issues unique per-session bridge tokens', async () => {
@@ -357,25 +362,6 @@ describe('CodexNativeBridgeManager', () => {
     })
 
     expect(serverConfigMap).toBeUndefined()
-  })
-
-  it('rewrites bridge module paths from app.asar to app.asar.unpacked when available', () => {
-    const resolvedPath = 'Resources/app.asar/node_modules/pkg/index.js'
-    const unpackedPath = 'Resources/app.asar.unpacked/node_modules/pkg/index.js'
-
-    const actual = normalizeBridgeModulePathForExternalNode(
-      resolvedPath,
-      (candidatePath) => candidatePath === unpackedPath,
-    )
-
-    expect(actual).toBe(unpackedPath)
-  })
-
-  it('throws an actionable error when bridge module remains inside app.asar', () => {
-    const resolvedPath = 'Resources/app.asar/node_modules/pkg/index.js'
-    expect(() => normalizeBridgeModulePathForExternalNode(resolvedPath, () => false)).toThrow(
-      /Ensure electron-builder asarUnpack includes this dependency\./,
-    )
   })
 
   it('returns 403 for list-tools with invalid token', async () => {

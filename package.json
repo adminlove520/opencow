@@ -9,8 +9,7 @@
     "predev": "pnpm exec electron-rebuild -f -w better-sqlite3,node-pty",
     "dev": "ulimit -n 10240 2>/dev/null; electron-vite dev",
     "dev:wt": "node scripts/dev-worktree.mjs",
-    "bundle:bridge": "node scripts/bundle-bridge-deps.mjs",
-    "build": "node scripts/bundle-bridge-deps.mjs && electron-vite build",
+    "build": "electron-vite build",
     "preview": "OPENCOW_ENV=production electron-vite preview",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
@@ -119,10 +118,9 @@
     "publish": null,
     "asar": true,
     "asarUnpack": [
-      "**/node_modules/@anthropic-ai/**",
-      "**/node_modules/@openai/**",
-      "**/node_modules/better-sqlite3/**",
-      "**/node_modules/node-pty/**"
+      "**/node_modules/better-sqlite3/**/*.node",
+      "**/node_modules/node-pty/**/*.node",
+      "**/node_modules/@openai/codex-*/vendor/**"
     ],
     "extraResources": [
       {
@@ -136,14 +134,6 @@
       {
         "from": "resources/icon.png",
         "to": "icon.png"
-      },
-      {
-        "from": "resources/codex-bridge-deps.cjs",
-        "to": "codex-bridge-deps.cjs"
-      },
-      {
-        "from": "resources/sdk-externals",
-        "to": "sdk-externals"
       }
     ],
     "mac": {

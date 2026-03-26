@@ -18,6 +18,7 @@
  * fields conditionally, and the SDK ignores unknown keys.
  */
 
+import type { SpawnOptions, SpawnedProcess } from '@anthropic-ai/claude-agent-sdk'
 import type { RuntimeCanUseTool } from './enginePolicy'
 import type { SDKHookMap } from '../services/capabilityCenter/claudeCodeAdapter'
 import type { CodexConfigObject } from './codexMcpConfigBuilder'
@@ -38,6 +39,7 @@ export interface SessionLaunchOptions {
 
   // ── Claude-specific ─────────────────────────────────────────────────────
   pathToClaudeCodeExecutable?: string
+  spawnClaudeCodeProcess?: (opts: SpawnOptions) => SpawnedProcess
   tools?: unknown[]
   disallowedTools?: string[]
   canUseTool?: RuntimeCanUseTool

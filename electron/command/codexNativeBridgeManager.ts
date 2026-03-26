@@ -4,9 +4,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import path from 'node:path'
 import os from 'node:os'
 import fs from 'node:fs/promises'
-import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import { app } from 'electron'
 import { createLogger } from '../platform/logger'
 import type { NativeCapabilityRegistry } from '../nativeCapabilities/registry'
 import type { NativeCapabilityToolContext, NativeToolDescriptor } from '../nativeCapabilities/types'
@@ -18,7 +16,7 @@ import {
   buildCodexNativeBridgeStdioScript,
   type CodexNativeBridgeStdioModules,
 } from './codexNativeBridgeStdioScript'
-import { resolveNodeExecutableForChildProcess } from '../platform/shellPath'
+import { getElectronAsNodePath, buildAsarAwareEnv } from '../platform/electronSpawn'
 import type { StartSessionNativeToolAllowItem } from '../../src/shared/types'
 
 const log = createLogger('CodexNativeBridgeManager')
@@ -31,7 +29,9 @@ const BRIDGE_SCRIPT_DIR = path.join(os.tmpdir(), 'opencow-codex-native-bridge')
 const BRIDGE_SCRIPT_PATH = path.join(BRIDGE_SCRIPT_DIR, 'stdio-bridge.cjs')
 const BRIDGE_MAX_JSON_BODY_BYTES = 512 * 1024
 const BRIDGE_TOOL_TIMEOUT_MS = 120_000
-const BRIDGE_DEPS_FILENAME = 'codex-bridge-deps.cjs'
+const MCP_SERVER_MODULE_SPECIFIER = '@modelcontextprotocol/sdk/server/mcp.js'
+const MCP_STDIO_TRANSPORT_MODULE_SPECIFIER = '@modelcontextprotocol/sdk/server/stdio.js'
+const ZOD_V4_MODULE_SPECIFIER = 'zod/v4'
 
 interface BridgeSessionEntry {
   token: string
@@ -65,7 +65,7 @@ export interface RegisterCodexBridgeSessionInput {
 }
 
 interface CodexNativeBridgeManagerOptions {
-  resolveBridgeCommand?: () => string | null
+  resolveBridgeCommand?: () => string
 }
 
 function optionalNonEmptyString(value: unknown): string | undefined {
@@ -74,56 +74,8 @@ function optionalNonEmptyString(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
-function resolveBridgeCommandDefault(): string | null {
-  return resolveNodeExecutableForChildProcess()
-}
-
-function toAsarUnpackedPath(filePath: string): string {
-  if (!filePath.includes('app.asar') || filePath.includes('app.asar.unpacked')) {
-    return filePath
-  }
-  return filePath.replace('app.asar', 'app.asar.unpacked')
-}
-
-export function normalizeBridgeModulePathForExternalNode(
-  filePath: string,
-  fileExists: (candidatePath: string) => boolean = existsSync,
-): string {
-  const unpacked = toAsarUnpackedPath(filePath)
-  if (unpacked === filePath) return filePath
-  if (!fileExists(unpacked)) {
-    throw new Error(
-      `Bridge dependency resolved inside app.asar, but unpacked file was not found at ${unpacked}. ` +
-        'Ensure electron-builder asarUnpack includes this dependency.',
-    )
-  }
-  return unpacked
-}
-
-/**
- * Resolve the path to the pre-bundled bridge dependencies CJS file.
- * In production the file is shipped as an extraResource; in dev it lives
- * in the project `resources/` directory.
- */
-export function resolveBridgeDepsBundle(
-  fileExists: (candidatePath: string) => boolean = existsSync,
-): string {
-  const candidates = app.isPackaged
-    ? [
-        path.join(process.resourcesPath, BRIDGE_DEPS_FILENAME),
-      ]
-    : [
-        path.join(__dirname, '../../resources', BRIDGE_DEPS_FILENAME),
-      ]
-
-  for (const candidate of candidates) {
-    if (fileExists(candidate)) return candidate
-  }
-
-  throw new Error(
-    `Bridge dependency bundle not found. Searched: ${candidates.join(', ')}. ` +
-      'Run "pnpm run bundle:bridge" to generate it.',
-  )
+function resolveBridgeCommandDefault(): string {
+  return getElectronAsNodePath()
 }
 
 /**
@@ -138,7 +90,7 @@ export class CodexNativeBridgeManager {
   private readonly sessions = new Map<string, BridgeSessionEntry>()
   private server: Server | null = null
   private port: number | null = null
-  private readonly resolveBridgeCommand: () => string | null
+  private readonly resolveBridgeCommand: () => string
 
   constructor(
     private readonly nativeCapabilityRegistry: NativeCapabilityRegistry,
@@ -180,15 +132,12 @@ export class CodexNativeBridgeManager {
         tools: toolMap,
       })
 
-      const env = {
+      const env = buildAsarAwareEnv({
         OPENCOW_CODEX_BRIDGE_URL: `http://127.0.0.1:${this.port}`,
         OPENCOW_CODEX_BRIDGE_TOKEN: token,
         OPENCOW_CODEX_BRIDGE_SESSION_ID: sessionId,
-      }
+      })
       const bridgeCommand = this.resolveBridgeCommand()
-      if (!bridgeCommand) {
-        throw new Error('Failed to resolve Node executable for Codex native bridge command')
-      }
 
       log.info(
         `Registered Codex native bridge session ${sessionId} with ${tools.length} tools ` +
@@ -282,7 +231,9 @@ export class CodexNativeBridgeManager {
 
   private resolveBridgeScriptModules(): CodexNativeBridgeStdioModules {
     return {
-      bridgeDepsPath: resolveBridgeDepsBundle(),
+      mcpServerModulePath: require.resolve(MCP_SERVER_MODULE_SPECIFIER),
+      stdioServerTransportModulePath: require.resolve(MCP_STDIO_TRANSPORT_MODULE_SPECIFIER),
+      zodModulePath: require.resolve(ZOD_V4_MODULE_SPECIFIER),
     }
   }
 
