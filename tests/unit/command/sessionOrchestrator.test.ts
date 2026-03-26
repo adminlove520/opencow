@@ -19,6 +19,10 @@ import type { CapabilityCenter } from '../../../electron/services/capabilityCent
 import type { CapabilityPlan } from '../../../electron/services/capabilityCenter/sessionInjector'
 import { MCP_SERVER_BASE_NAME } from '../../../src/shared/appIdentity'
 
+vi.mock('electron', () => ({
+  app: { isPackaged: false },
+}))
+
 // Mock the SDK query — returns a controllable async generator with full Query interface
 const mockClose = vi.fn()
 let pendingNextResolvers: Array<(v: IteratorResult<unknown>) => void> = []
