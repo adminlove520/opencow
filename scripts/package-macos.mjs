@@ -182,6 +182,12 @@ function run() {
     arches,
   })
 
+  log('Bundling bridge dependencies')
+  const bundleStatus = runCommand('node', ['scripts/bundle-bridge-deps.mjs'], { cwd: projectDir })
+  if (bundleStatus !== 0) {
+    process.exit(bundleStatus)
+  }
+
   log('Building electron-vite artifacts')
   const buildStatus = runCommand('pnpm', ['exec', 'electron-vite', 'build'], { cwd: projectDir })
   if (buildStatus !== 0) {

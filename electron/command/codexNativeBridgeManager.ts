@@ -6,6 +6,7 @@ import os from 'node:os'
 import fs from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
+import { app } from 'electron'
 import { createLogger } from '../platform/logger'
 import type { NativeCapabilityRegistry } from '../nativeCapabilities/registry'
 import type { NativeCapabilityToolContext, NativeToolDescriptor } from '../nativeCapabilities/types'
@@ -30,9 +31,7 @@ const BRIDGE_SCRIPT_DIR = path.join(os.tmpdir(), 'opencow-codex-native-bridge')
 const BRIDGE_SCRIPT_PATH = path.join(BRIDGE_SCRIPT_DIR, 'stdio-bridge.cjs')
 const BRIDGE_MAX_JSON_BODY_BYTES = 512 * 1024
 const BRIDGE_TOOL_TIMEOUT_MS = 120_000
-const MCP_SERVER_MODULE_SPECIFIER = '@modelcontextprotocol/sdk/server/mcp.js'
-const MCP_STDIO_TRANSPORT_MODULE_SPECIFIER = '@modelcontextprotocol/sdk/server/stdio.js'
-const ZOD_V4_MODULE_SPECIFIER = 'zod/v4'
+const BRIDGE_DEPS_FILENAME = 'codex-bridge-deps.cjs'
 
 interface BridgeSessionEntry {
   token: string
@@ -99,6 +98,32 @@ export function normalizeBridgeModulePathForExternalNode(
     )
   }
   return unpacked
+}
+
+/**
+ * Resolve the path to the pre-bundled bridge dependencies CJS file.
+ * In production the file is shipped as an extraResource; in dev it lives
+ * in the project `resources/` directory.
+ */
+export function resolveBridgeDepsBundle(
+  fileExists: (candidatePath: string) => boolean = existsSync,
+): string {
+  const candidates = app.isPackaged
+    ? [
+        path.join(process.resourcesPath, BRIDGE_DEPS_FILENAME),
+      ]
+    : [
+        path.join(__dirname, '../../resources', BRIDGE_DEPS_FILENAME),
+      ]
+
+  for (const candidate of candidates) {
+    if (fileExists(candidate)) return candidate
+  }
+
+  throw new Error(
+    `Bridge dependency bundle not found. Searched: ${candidates.join(', ')}. ` +
+      'Run "pnpm run bundle:bridge" to generate it.',
+  )
 }
 
 /**
@@ -257,19 +282,7 @@ export class CodexNativeBridgeManager {
 
   private resolveBridgeScriptModules(): CodexNativeBridgeStdioModules {
     return {
-      mcpServerModulePath: this.resolveBridgeModulePath(MCP_SERVER_MODULE_SPECIFIER),
-      stdioServerTransportModulePath: this.resolveBridgeModulePath(MCP_STDIO_TRANSPORT_MODULE_SPECIFIER),
-      zodModulePath: this.resolveBridgeModulePath(ZOD_V4_MODULE_SPECIFIER),
-    }
-  }
-
-  private resolveBridgeModulePath(specifier: string): string {
-    try {
-      const resolved = require.resolve(specifier)
-      return normalizeBridgeModulePathForExternalNode(resolved)
-    } catch (err) {
-      const details = err instanceof Error ? err.message : String(err)
-      throw new Error(`Failed to resolve bridge dependency "${specifier}": ${details}`, { cause: err })
+      bridgeDepsPath: resolveBridgeDepsBundle(),
     }
   }
 

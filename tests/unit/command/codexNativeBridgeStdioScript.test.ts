@@ -5,9 +5,7 @@ import { buildCodexNativeBridgeStdioScript } from '../../../electron/command/cod
 
 describe('buildCodexNativeBridgeStdioScript', () => {
   const modules = {
-    mcpServerModulePath: '/tmp/fake/mcp.js',
-    stdioServerTransportModulePath: '/tmp/fake/stdio.js',
-    zodModulePath: '/tmp/fake/zod.js',
+    bridgeDepsPath: '/tmp/fake/codex-bridge-deps.cjs',
   }
 
   it('contains required bridge environment variable checks and endpoints', () => {
@@ -51,12 +49,11 @@ describe('buildCodexNativeBridgeStdioScript', () => {
     expect(script).toContain('node.additionalProperties')
   })
 
-  it('pins dependencies to absolute module paths (no temp-dir bare imports)', () => {
+  it('pins dependencies to the pre-bundled bridge deps file (no bare imports)', () => {
     const script = buildCodexNativeBridgeStdioScript(modules)
 
-    expect(script).toContain(`require("${modules.mcpServerModulePath}")`)
-    expect(script).toContain(`require("${modules.stdioServerTransportModulePath}")`)
-    expect(script).toContain(`require("${modules.zodModulePath}")`)
+    expect(script).toContain(`require("${modules.bridgeDepsPath}")`)
+    expect(script).toContain('McpServer, StdioServerTransport, z')
     expect(script).not.toContain(`from '@modelcontextprotocol/sdk/server/mcp.js'`)
     expect(script).not.toContain(`from 'zod/v4'`)
   })

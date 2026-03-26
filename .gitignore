@@ -9,6 +9,7 @@ package-lock.json
 # Build
 dist/
 build/
+resources/codex-bridge-deps.cjs
 .next/
 out/
 index.js

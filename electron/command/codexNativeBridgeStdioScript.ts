@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 export interface CodexNativeBridgeStdioModules {
-  mcpServerModulePath: string
-  stdioServerTransportModulePath: string
-  zodModulePath: string
+  bridgeDepsPath: string
 }
 
 export function buildCodexNativeBridgeStdioScript(modules: CodexNativeBridgeStdioModules): string {
   return `#!/usr/bin/env node
-const { McpServer } = require(${JSON.stringify(modules.mcpServerModulePath)})
-const { StdioServerTransport } = require(${JSON.stringify(modules.stdioServerTransportModulePath)})
-const { z } = require(${JSON.stringify(modules.zodModulePath)})
+const { McpServer, StdioServerTransport, z } = require(${JSON.stringify(modules.bridgeDepsPath)})
 
 async function main() {
   const bridgeUrl = process.env.OPENCOW_CODEX_BRIDGE_URL
