@@ -166,6 +166,17 @@
         }
       }
     },
+    "dmg": {
+      "iconSize": 128,
+      "contents": [
+        { "x": 192, "y": 244, "type": "file" },
+        { "x": 548, "y": 244, "type": "link", "path": "/Applications" }
+      ],
+      "window": {
+        "width": 740,
+        "height": 480
+      }
+    },
     "win": {
       "icon": "resources/icon.png"
     },
