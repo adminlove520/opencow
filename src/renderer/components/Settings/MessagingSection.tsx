@@ -272,19 +272,19 @@ export function MessagingSection(): React.JSX.Element {
   return (
     <div className="space-y-5">
       {/* ── Section header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="h-9 w-9 rounded-xl bg-[hsl(var(--primary)/0.08)] flex items-center justify-center flex-none">
             <Bot className="h-4.5 w-4.5 text-[hsl(var(--primary))]" aria-hidden="true" />
           </div>
-          <div>
-            <h3 className="text-sm font-semibold">{t('messaging.title')}</h3>
-            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold truncate">{t('messaging.title')}</h3>
+            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-0.5 line-clamp-2">
               {t('messaging.description')}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-none">
           <button
             type="button"
             onClick={() => setShowBotCreator(true)}
