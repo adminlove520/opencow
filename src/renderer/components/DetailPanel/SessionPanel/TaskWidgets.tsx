@@ -198,7 +198,7 @@ export function buildTaskLifecycleMap(
       // Collect Task tool_use IDs + tool_result content from this assistant message
       if (msg.role === 'assistant') {
         for (const block of msg.content) {
-          if (block.type === 'tool_use' && block.name === 'Task') {
+          if (block.type === 'tool_use' && (block.name === 'Agent' || block.name === 'Task')) {
             // Ensure the block has a map entry (even without system events)
             if (!map.has(block.id)) {
               map.set(block.id, { state: 'pending' })

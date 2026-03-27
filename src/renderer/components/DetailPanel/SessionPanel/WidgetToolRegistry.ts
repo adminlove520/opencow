@@ -73,6 +73,7 @@ import { NativeCapabilityTools } from '@shared/nativeCapabilityToolNames'
 
 const WIDGET_REGISTRY = new Map<string, WidgetRegistration>([
   // ── Native SDK tools ──────────────────────────────────────────────────────
+  ['Agent',           { component: TaskExecutionView,    suppressResult: true  }],
   ['Task',            { component: TaskExecutionView,    suppressResult: true  }],
   ['TodoWrite',       { component: TodoWriteWidget,      suppressResult: false }],
   ['AskUserQuestion', { component: AskUserQuestionWidget, suppressResult: false }],
