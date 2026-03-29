@@ -76,7 +76,7 @@ if [ \${#INPUT} -gt ${MAX_LINE_CHARS} ]; then
   INPUT="\${INPUT:0:${MAX_LINE_CHARS}}"
 fi
 
-echo "{\\"timestamp\\":\\"$TIMESTAMP\\",\\"payload\\":\$INPUT}" >> "$EVENT_LOG"
+echo "{\\"timestamp\\":\\"$TIMESTAMP\\",\\"payload\\":$INPUT}" >> "$EVENT_LOG"
 `
 }
 

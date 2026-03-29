@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.10] - 2026-03-29
+
+### Added
+- Persistent memory system with LLM extraction, merge, quality gate, and management UI
+- Cross-scope memory extraction with LLM-driven scope classification (user vs project)
+- Memory Toast for real-time memory confirmation/editing with merge diff view
+- MemoryView panel with search, category filter, bulk operations, and project scoping
+- Memory Settings section with extraction delay configuration
+- HeadlessLLMClient using Vercel AI SDK for engine-agnostic memory extraction
+
+### Changed
+- RepoAnalyzer migrated to SessionOrchestrator for engine-agnostic marketplace analysis
+- Provider auth system extended with HTTPAuth abstraction and engine-specific API key providers (AnthropicApiKeyProvider / OpenAIApiKeyProvider)
+- Memory extraction content strategy: full conversation with turn-based recent-priority compression (replaces last-10-messages window)
+- Extraction pipeline excludes non-conversational sessions (market-analyzer, schedule)
+
+### Fixed
+- CapabilityCacheManager infinite recursion on package install (invalidate → dispatch → invalidate loop)
+- MCP server configuration extracted to shared module to prevent SDK fatal exits
+- UI lag during active agent streaming reduced
+- Marketplace InstallDialog prevents Install button on empty/failed analysis results
+
 ## [0.3.9] - 2026-03-27
 
 ### Added
