@@ -14,6 +14,7 @@
   "searchPlaceholder": "Search memories...",
   "select": "Select memory",
   "scopeAll": "All",
+  "includeGlobal": "Global",
   "scopeUser": "User",
   "scopeProject": "Project",
   "categoryAll": "All Categories",

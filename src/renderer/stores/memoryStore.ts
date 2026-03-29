@@ -108,20 +108,28 @@ export const useMemoryStore = create<MemoryStore>((set, get) => ({
   // ── Data Loading ──
 
   loadMemories: async (params) => {
-    const api = getAppAPI()
-    const memories = await api['memory:list'](params ?? {
-      status: 'confirmed',
-      sortBy: 'updated_at',
-      sortOrder: 'desc',
-      limit: 200,
-    })
-    set({ memories })
+    try {
+      const api = getAppAPI()
+      const memories = await api['memory:list'](params ?? {
+        status: 'confirmed',
+        sortBy: 'updated_at',
+        sortOrder: 'desc',
+        limit: 200,
+      })
+      set({ memories })
+    } catch {
+      // IPC call failed — keep existing state rather than clearing to empty
+    }
   },
 
   loadStats: async (projectId) => {
-    const api = getAppAPI()
-    const stats = await api['memory:stats'](projectId)
-    set({ stats })
+    try {
+      const api = getAppAPI()
+      const stats = await api['memory:stats'](projectId)
+      set({ stats })
+    } catch {
+      // IPC call failed — keep existing state
+    }
   },
 
   loadSettings: async (projectId) => {

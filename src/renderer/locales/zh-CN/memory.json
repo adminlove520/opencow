@@ -14,6 +14,7 @@
   "searchPlaceholder": "搜索记忆...",
   "select": "选择记忆",
   "scopeAll": "全部",
+  "includeGlobal": "全局",
   "scopeUser": "用户",
   "scopeProject": "项目",
   "categoryAll": "全部分类",

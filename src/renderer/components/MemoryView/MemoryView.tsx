@@ -2,14 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Brain, Plus, Search, Archive, Trash2, X } from 'lucide-react'
+import { Brain, Globe, Plus, Search, Archive, Trash2, X } from 'lucide-react'
 import { useAppStore } from '@/stores/appStore'
 import { useMemoryStore } from '@/stores/memoryStore'
-import { ProjectPicker } from '@/components/ui/ProjectPicker'
+import { getAppAPI } from '@/windowAPI'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { MemoryCard } from './MemoryCard'
 import { MemoryCreateModal } from './MemoryCreateModal'
 import { CategoryPillMenu } from './CategoryPillMenu'
+import { cn } from '@/lib/utils'
 import type { MemoryCategory } from '@shared/types'
 
 const SEARCH_DEBOUNCE_MS = 300
@@ -36,50 +37,77 @@ export function MemoryView(): React.JSX.Element {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [searchInput, setSearchInput] = useState('')
   const [isLoading, setIsLoading] = useState(true)
-  const [filterProjectId, setFilterProjectId] = useState<string | null>(activeProjectId)
+  const [includeGlobal, setIncludeGlobal] = useState(true)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Load on mount and filter changes
+  // Load on mount and filter changes.
+  // When a project is active and includeGlobal is on, we fetch both project-scoped
+  // and user-scoped (global) memories and merge them, since the API only supports
+  // filtering by a single scope per request.
   useEffect(() => {
     setIsLoading(true)
-    const params = {
-      scope: filterProjectId ? 'project' as const : undefined,
+    const baseParams = {
       category: categoryFilter ?? undefined,
-      projectId: filterProjectId ?? undefined,
       status: 'confirmed' as const,
       sortBy: 'updated_at' as const,
       sortOrder: 'desc' as const,
       limit: 200,
     }
-    Promise.all([
-      loadMemories(params),
-      loadStats(filterProjectId ?? undefined),
-    ]).finally(() => setIsLoading(false))
-  }, [filterProjectId, categoryFilter]) // eslint-disable-line react-hooks/exhaustive-deps
+
+    if (activeProjectId && includeGlobal) {
+      // Fetch project memories + global memories, merge and deduplicate
+      const projectParams = { ...baseParams, scope: 'project' as const, projectId: activeProjectId }
+      const globalParams = { ...baseParams, scope: 'user' as const }
+      Promise.all([
+        getAppAPI()['memory:list'](projectParams),
+        getAppAPI()['memory:list'](globalParams),
+        loadStats(activeProjectId),
+      ]).then(([projectMemories, globalMemories]) => {
+        // Merge and sort by updated_at desc
+        const merged = [...projectMemories, ...globalMemories]
+          .sort((a, b) => b.updatedAt - a.updatedAt)
+          .slice(0, 200)
+        useMemoryStore.setState({ memories: merged })
+      }).catch(() => {
+        // Keep existing state on error
+      }).finally(() => setIsLoading(false))
+    } else if (activeProjectId) {
+      // Project only (includeGlobal off)
+      void Promise.all([
+        loadMemories({ ...baseParams, scope: 'project', projectId: activeProjectId }),
+        loadStats(activeProjectId),
+      ]).finally(() => setIsLoading(false))
+    } else {
+      // No active project — show all memories
+      void Promise.all([
+        loadMemories(baseParams),
+        loadStats(),
+      ]).finally(() => setIsLoading(false))
+    }
+  }, [activeProjectId, includeGlobal, categoryFilter]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
   const reloadWithFilters = useCallback((query?: string) => {
     if (query?.trim()) {
+      // Search doesn't support dual-scope merge — search across all scopes
       void searchMemories(query, {
-        scope: filterProjectId ? 'project' : undefined,
-        projectId: filterProjectId ?? undefined,
         category: categoryFilter ?? undefined,
       })
     } else {
       setSearchQuery('')
+      // Re-trigger the main load effect by clearing search
+      // The effect handles the includeGlobal merge logic
       void loadMemories({
-        scope: filterProjectId ? 'project' : undefined,
         category: categoryFilter ?? undefined,
-        projectId: filterProjectId ?? undefined,
         status: 'confirmed',
         sortBy: 'updated_at',
         sortOrder: 'desc',
         limit: 200,
       })
     }
-  }, [searchMemories, setSearchQuery, loadMemories, filterProjectId, categoryFilter])
+  }, [searchMemories, setSearchQuery, loadMemories, categoryFilter])
 
   const handleSearchChange = useCallback((value: string) => {
     setSearchInput(value)
@@ -149,14 +177,22 @@ export function MemoryView(): React.JSX.Element {
           </div>
 
           {/* Filters */}
-          <ProjectPicker
-            value={filterProjectId}
-            onChange={setFilterProjectId}
-            placeholder={t('scopeAll')}
-            ariaLabel={t('scopeAll')}
-            triggerClassName="rounded-full py-1 px-2.5 text-xs"
-            position="below"
-          />
+          {activeProjectId && (
+            <button
+              onClick={() => setIncludeGlobal((prev) => !prev)}
+              className={cn(
+                'flex items-center gap-1.5 rounded-full py-1 px-2.5 text-xs transition-colors',
+                includeGlobal
+                  ? 'bg-[hsl(var(--primary)/0.1)] text-[hsl(var(--primary))]'
+                  : 'text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--foreground)/0.04)]',
+              )}
+              aria-label={t('includeGlobal')}
+              aria-pressed={includeGlobal}
+            >
+              <Globe className="h-3 w-3" aria-hidden="true" />
+              {t('includeGlobal')}
+            </button>
+          )}
           <CategoryPillMenu
             value={categoryFilter}
             onChange={setCategoryFilter}
