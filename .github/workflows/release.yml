@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build-and-release:
-    name: Build & Release
+    name: Build & Release (macOS)
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +82,7 @@ jobs:
 
       # Electron Builder — produces DMG + ZIP for macOS (universal binary)
       # With code signing and notarization enabled.
-      - name: Build Electron App
+      - name: Build Electron App (macOS)
         run: npx electron-builder --mac --universal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,17 +94,89 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
-      # ── Publish ───────────────────────────────────────────────────────
-      # Upload only installer artifacts (DMG + ZIP). Blockmap files are
-      # excluded — they are only needed by electron-updater (Phase 3).
-      # The *.dmg.zip (DMG archive) is excluded via negation pattern.
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: dist/*.dmg
+          retention-days: 5
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build Electron App (Windows)
+        run: npx electron-builder --win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: dist/*.exe
+          retention-days: 5
+
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Build Electron App (Linux)
+        run: npx electron-builder --linux
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: dist/*.AppImage
+          retention-days: 5
+
+  create-release:
+    name: Create Release
+    needs: [build-and-release, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: OpenCow v${{ env.VERSION }}
+          name: OpenCow v${{ github.ref_name }}
           files: |
-            dist/*.dmg
-            dist/*-mac.zip
+            dist/**/*.dmg
+            dist/**/*.exe
+            dist/**/*.AppImage
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
