@@ -39,21 +39,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation (skip for test tags) ──────────────────────
-      - name: Validate version
-        if: ${{ !contains(github.ref_name, '-test') }}
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) != package.json ($PKG_VERSION)"
-            exit 1
-          fi
-
-      # ── Quality gates (skip - these are pre-existing code issues) ─────
-      # - name: Lint
-      # - name: Typecheck
-      # - name: Test
+      # ── Compile TypeScript (MUST do before packaging) ────────────────
+      - name: Build electron-vite artifacts
+        run: pnpm exec electron-vite build
 
       # ── macOS signing (证书为空时会失败，但不影响其他平台) ───────────
       - name: Import macOS signing certificate
@@ -113,22 +101,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation (skip for test tags) ──────────────────────
-      - name: Validate version
-        if: ${{ !contains(github.ref_name, '-test') }}
-        shell: pwsh
-        run: |
-          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
-          $pkgVersion = node -p "require('./package.json').version"
-          if ($tagVersion -ne $pkgVersion) {
-            Write-Error "Tag version ($tagVersion) != package.json ($pkgVersion)"
-            exit 1
-          }
-
-      # ── Quality gates (skip - these are pre-existing code issues) ─────
-      # - name: Lint
-      # - name: Typecheck
-      # - name: Test
+      # ── Compile TypeScript (MUST do before packaging) ────────────────
+      - name: Build electron-vite artifacts
+        run: pnpm exec electron-vite build
 
       # ── Build ─────────────────────────────────────────────────────────
       - name: Build Electron App (Windows)
@@ -185,21 +160,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation (skip for test tags) ──────────────────────
-      - name: Validate version
-        if: ${{ !contains(github.ref_name, '-test') }}
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) != package.json ($PKG_VERSION)"
-            exit 1
-          fi
-
-      # ── Quality gates (skip - these are pre-existing code issues) ─────
-      # - name: Lint
-      # - name: Typecheck
-      # - name: Test
+      # ── Compile TypeScript (MUST do before packaging) ────────────────
+      - name: Build electron-vite artifacts
+        run: pnpm exec electron-vite build
 
       # ── Build ─────────────────────────────────────────────────────────
       - name: Build Electron App (Linux)
