@@ -295,6 +295,14 @@ pnpm package
 # macOS .dmg（用于分发）
 pnpm package:dmg
 # 输出：dist/OpenCow-{version}.dmg
+
+# Windows .exe（用于分发）
+pnpm package:win
+# 输出：dist/OpenCow-Setup-{version}.exe
+
+# Linux .AppImage / .deb（用于分发）
+pnpm package:linux
+# 输出：dist/OpenCow-{version}.AppImage, dist/OpenCow-{version}.deb
 ```
 
 通过 `package.json` 中的 electron-builder 配置，支持 Windows 和 Linux 的跨平台构建。

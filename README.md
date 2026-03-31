@@ -295,6 +295,14 @@ pnpm package
 # macOS .dmg (for distribution)
 pnpm package:dmg
 # Output: dist/OpenCow-{version}.dmg
+
+# Windows .exe (for distribution)
+pnpm package:win
+# Output: dist/OpenCow-Setup-{version}.exe
+
+# Linux .AppImage / .deb (for distribution)
+pnpm package:linux
+# Output: dist/OpenCow-{version}.AppImage, dist/OpenCow-{version}.deb
 ```
 
 Cross-platform builds for Windows and Linux are supported via electron-builder configuration in `package.json`.

@@ -27,6 +27,8 @@
     "package:dmg:x64": "node scripts/package-macos.mjs --x64",
     "package:dmg:universal": "node scripts/package-macos.mjs --universal",
     "package:dmg:all": "node scripts/package-macos.mjs --arm64 --x64",
+    "package:win": "electron-builder --win",
+    "package:linux": "electron-builder --linux",
     "postinstall": "bash scripts/patch-electron-name.sh",
     "check:brand": "node scripts/check-brand.mjs"
   },
@@ -190,10 +192,25 @@
       }
     },
     "win": {
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "OpenCow",
+      "artifactName": "OpenCow-Setup-${version}.${ext}"
     },
     "linux": {
-      "icon": "resources/icon.png"
+      "icon": "resources/icon.png",
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility"
     }
   },
   "pnpm": {

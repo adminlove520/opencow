@@ -15,8 +15,12 @@ permissions:
 
 jobs:
   build-and-release:
-    name: Build & Release
-    runs-on: macos-latest
+    name: Build & Release (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest, ubuntu-latest]
+
     steps:
       - uses: actions/checkout@v4
 
@@ -31,8 +35,8 @@ jobs:
 
       # ── Version validation ────────────────────────────────────────────
       # Ensure the git tag matches the version declared in package.json.
-      # Prevents accidental releases with mismatched version numbers.
       - name: Validate tag matches package.json version
+        shell: bash
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
@@ -48,9 +52,8 @@ jobs:
       - run: pnpm test
 
       # ── macOS Code Signing ─────────────────────────────────────────────
-      # Import the Developer ID Application certificate into a temporary
-      # keychain so electron-builder can sign the app in CI.
       - name: Import macOS signing certificate
+        if: matrix.os == 'macos-latest'
         env:
           MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -80,9 +83,9 @@ jobs:
       # Vite build (main + preload + renderer)
       - run: pnpm build
 
-      # Electron Builder — produces DMG + ZIP for macOS (universal binary)
-      # With code signing and notarization enabled.
-      - name: Build Electron App
+      # Electron Builder
+      - name: Build Electron App (macOS)
+        if: matrix.os == 'macos-latest'
         run: npx electron-builder --mac --universal
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -94,17 +97,29 @@ jobs:
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
+      - name: Build Electron App (Windows)
+        if: matrix.os == 'windows-latest'
+        run: npx electron-builder --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron App (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: npx electron-builder --linux
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # ── Publish ───────────────────────────────────────────────────────
-      # Upload only installer artifacts (DMG + ZIP). Blockmap files are
-      # excluded — they are only needed by electron-updater (Phase 3).
-      # The *.dmg.zip (DMG archive) is excluded via negation pattern.
-      - name: Create GitHub Release
+      - name: Create or Update GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: OpenCow v${{ env.VERSION }}
           files: |
             dist/*.dmg
-            dist/*-mac.zip
+            dist/*.exe
+            dist/*.zip
+            dist/*.AppImage
+            dist/*.deb
           generate_release_notes: true
           draft: false
           prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
