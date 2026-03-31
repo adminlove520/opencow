@@ -1,13 +1,13 @@
 {
   "name": "opencow",
   "productName": "OpenCow",
-  "version": "0.3.12",
+  "version": "0.3.13",
   "description": "Task-driven autonomous AI agent platform",
   "packageManager": "pnpm@10.13.1",
   "main": "./out/main/index.js",
   "scripts": {
     "predev": "pnpm exec electron-rebuild -f -w better-sqlite3,node-pty",
-    "dev": "ulimit -n 10240 2>/dev/null; electron-vite dev",
+    "dev": "electron-vite dev",
     "dev:wt": "node scripts/dev-worktree.mjs",
     "build": "electron-vite build",
     "preview": "OPENCOW_ENV=production electron-vite preview",
@@ -17,9 +17,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "pretest": "bash scripts/rebuild-better-sqlite3.sh node",
+    "pretest": "node scripts/rebuild-better-sqlite3.mjs node",
     "test": "vitest run",
-    "pretest:watch": "bash scripts/rebuild-better-sqlite3.sh node",
+    "pretest:watch": "node scripts/rebuild-better-sqlite3.mjs node",
     "test:watch": "vitest",
     "package": "node scripts/package-macos.mjs --dir",
     "package:dmg": "node scripts/package-macos.mjs",
@@ -29,7 +29,7 @@
     "package:dmg:all": "node scripts/package-macos.mjs --arm64 --x64",
     "package:win": "electron-builder --win",
     "package:linux": "electron-builder --linux",
-    "postinstall": "bash scripts/patch-electron-name.sh",
+    "postinstall": "node scripts/postinstall.mjs",
     "check:brand": "node scripts/check-brand.mjs"
   },
   "keywords": [
