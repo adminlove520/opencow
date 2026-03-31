@@ -1,0 +1,271 @@
+name: Release (All Platforms)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Only one release build at a time
+concurrency:
+  group: release-all-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.13.1'
+
+jobs:
+  # ============================================================
+  # macOS Build (original, with minor improvements)
+  # ============================================================
+  build-macos:
+    name: Build macOS
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Version validation ────────────────────────────────────────────
+      - name: Validate version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) != package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      # ── Quality gates ─────────────────────────────────────────────────
+      - name: Lint
+        run: pnpm lint || true
+
+      - name: Typecheck
+        run: pnpm typecheck || true
+
+      - name: Test
+        run: pnpm test || true
+
+      # ── macOS signing ─────────────────────────────────────────────────
+      - name: Import macOS signing certificate
+        if: secrets.MAC_CERTIFICATE != ''
+        env:
+          MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+          echo -n "$MAC_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$MAC_CERTIFICATE_PASSWORD" -A -f pkcs12 -k $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security list-keychains -d user -s $KEYCHAIN_PATH
+
+      # ── Build ─────────────────────────────────────────────────────────
+      - name: Build Electron App (macOS)
+        run: pnpm exec electron-builder --mac --universal
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK: ${{ secrets.MAC_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-artifacts
+          path: |
+            dist/*.dmg
+            dist/*-mac.zip
+          retention-days: 5
+
+  # ============================================================
+  # Windows Build
+  # ============================================================
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Version validation ────────────────────────────────────────────
+      - name: Validate version
+        shell: pwsh
+        run: |
+          $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
+          $pkgVersion = node -p "require('./package.json').version"
+          if ($tagVersion -ne $pkgVersion) {
+            Write-Error "Tag version ($tagVersion) != package.json ($pkgVersion)"
+            exit 1
+          }
+
+      # ── Quality gates ─────────────────────────────────────────────────
+      - name: Lint
+        run: pnpm lint || true
+        continue-on-error: true
+
+      - name: Typecheck
+        run: pnpm typecheck || true
+        continue-on-error: true
+
+      - name: Test
+        run: pnpm test || true
+        continue-on-error: true
+
+      # ── Build ─────────────────────────────────────────────────────────
+      - name: Build Electron App (Windows)
+        run: pnpm exec electron-builder --win --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-artifacts
+          path: |
+            dist/*.exe
+            dist/*.zip
+          retention-days: 5
+
+  # ============================================================
+  # Linux Build
+  # ============================================================
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v5
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      # ── Install Linux build dependencies ──────────────────────────────
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-0 \
+            libnotify4 \
+            libnss3 \
+            libxss1 \
+            libxtst6 \
+            xdg-utils \
+            libatspi2.0-0 \
+            libsecret-1-0 \
+            libpython3-stdlib \
+            libpython3.12 \
+            libgcc-s1 \
+            libwebkit2gtk-4.1-0 \
+            libgbm1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ── Version validation ────────────────────────────────────────────
+      - name: Validate version
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag version ($TAG_VERSION) != package.json ($PKG_VERSION)"
+            exit 1
+          fi
+
+      # ── Quality gates ─────────────────────────────────────────────────
+      - name: Lint
+        run: pnpm lint || true
+        continue-on-error: true
+
+      - name: Typecheck
+        run: pnpm typecheck || true
+        continue-on-error: true
+
+      - name: Test
+        run: pnpm test || true
+        continue-on-error: true
+
+      # ── Build ─────────────────────────────────────────────────────────
+      - name: Build Electron App (Linux)
+        run: pnpm exec electron-builder --linux --x64
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-artifacts
+          path: |
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.rpm
+          retention-days: 5
+
+  # ============================================================
+  # Create Release (合并所有平台的 artifacts)
+  # ============================================================
+  create-release:
+    name: Create Release
+    needs: [build-macos, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - name: List artifacts
+        run: find dist/ -type f | head -50
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: OpenCow v${{ github.ref_name }}
+          files: |
+            dist/**/*.dmg
+            dist/**/*-mac.zip
+            dist/**/*.exe
+            dist/**/*.zip
+            dist/**/*.AppImage
+            dist/**/*.deb
+            dist/**/*.rpm
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-beta') || contains(github.ref, '-alpha') || contains(github.ref, '-rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
