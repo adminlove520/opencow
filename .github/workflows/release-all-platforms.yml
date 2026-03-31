@@ -39,8 +39,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation ────────────────────────────────────────────
+      # ── Version validation (skip for test tags) ──────────────────────
       - name: Validate version
+        if: ${{ !contains(github.ref_name, '-test') }}
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
@@ -118,8 +119,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation ────────────────────────────────────────────
+      # ── Version validation (skip for test tags) ──────────────────────
       - name: Validate version
+        if: ${{ !contains(github.ref_name, '-test') }}
         shell: pwsh
         run: |
           $tagVersion = $env:GITHUB_REF_NAME -replace '^v', ''
@@ -197,8 +199,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── Version validation ────────────────────────────────────────────
+      # ── Version validation (skip for test tags) ──────────────────────
       - name: Validate version
+        if: ${{ !contains(github.ref_name, '-test') }}
         run: |
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PKG_VERSION=$(node -p "require('./package.json').version")
