@@ -28,7 +28,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
@@ -53,7 +53,7 @@ jobs:
 
       # ── macOS Code Signing ─────────────────────────────────────────────
       - name: Import macOS signing certificate
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE != ''
         env:
           MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
@@ -63,7 +63,7 @@ jobs:
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
           # Decode the certificate from base64
-          echo -n "$MAC_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          echo "$MAC_CERTIFICATE" | base64 --decode > $CERTIFICATE_PATH
 
           # Create a temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
