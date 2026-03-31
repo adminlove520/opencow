@@ -1,24 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
+import type { SDKUserMessage } from '@anthropic-ai/claude-agent-sdk'
 import type { UserMessageContent } from '../../src/shared/types'
 
-interface SDKUserMessage {
-  type: 'user'
-  message: { role: 'user'; content: string | unknown[] }
-  parent_tool_use_id: null
-  session_id: string
-}
-
-type SDKTextBlock = { type: 'text'; text: string }
-type SDKImageBlock = { type: 'image'; source: { type: 'base64'; media_type: string; data: string } }
-type SDKDocumentBlock = {
-  type: 'document'
-  source:
-    | { type: 'base64'; media_type: string; data: string }
-    | { type: 'text'; media_type: 'text/plain'; data: string }
-  title?: string
-}
-type SDKContentBlock = SDKTextBlock | SDKImageBlock | SDKDocumentBlock
+type SDKContentBlock = SDKUserMessage['message']['content'] extends Array<infer T> ? T : never
 
 /**
  * Build a CLI-compatible <command-message> XML string.
@@ -63,12 +48,12 @@ function toSDKContent(content: UserMessageContent): string | SDKContentBlock[] {
   for (const block of content) {
     switch (block.type) {
       case 'text':
-        result.push({ type: 'text', text: block.text })
+        result.push({ type: 'text', text: block.text } as SDKContentBlock)
         break
       case 'slash_command':
         // CLI-compatible format: command invocation XML + expanded template content
-        result.push({ type: 'text', text: buildCommandXml(block.name, userArgs) })
-        result.push({ type: 'text', text: block.expandedText })
+        result.push({ type: 'text', text: buildCommandXml(block.name, userArgs) } as SDKContentBlock)
+        result.push({ type: 'text', text: block.expandedText } as SDKContentBlock)
         break
       case 'image':
         result.push({
@@ -78,7 +63,7 @@ function toSDKContent(content: UserMessageContent): string | SDKContentBlock[] {
             media_type: block.mediaType,
             data: block.data,
           },
-        })
+        } as SDKContentBlock)
         break
       case 'document':
         result.push({
@@ -87,7 +72,7 @@ function toSDKContent(content: UserMessageContent): string | SDKContentBlock[] {
             ? { type: 'text', media_type: 'text/plain', data: block.data }
             : { type: 'base64', media_type: block.mediaType, data: block.data },
           title: block.title,
-        })
+        } as SDKContentBlock)
         break
       default: {
         const _exhaustive: never = block
