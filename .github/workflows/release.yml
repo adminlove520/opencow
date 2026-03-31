@@ -53,17 +53,22 @@ jobs:
 
       # ── macOS Code Signing ─────────────────────────────────────────────
       - name: Import macOS signing certificate
-        if: matrix.os == 'macos-latest' && secrets.MAC_CERTIFICATE != ''
+        if: matrix.os == 'macos-latest'
         env:
           MAC_CERTIFICATE: ${{ secrets.MAC_CERTIFICATE }}
           MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
         run: |
+          if [ -z "$MAC_CERTIFICATE" ]; then
+            echo "MAC_CERTIFICATE secret is missing. Skipping certificate import."
+            exit 0
+          fi
+
           CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
           # Decode the certificate from base64
-          echo "$MAC_CERTIFICATE" | base64 --decode > $CERTIFICATE_PATH
+          echo "$MAC_CERTIFICATE" | base64 --decode --ignore-garbage > $CERTIFICATE_PATH
 
           # Create a temporary keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
@@ -71,10 +76,9 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           # Import certificate + private key into the keychain
-          security import $CERTIFICATE_PATH -P "$MAC_CERTIFICATE_PASSWORD" \
+          security import $CERTIFICATE_PATH -P "$MAC_CERTIFICATE_PASSWORD" -k $KEYCHAIN_PATH \
             -A -f pkcs12 -k $KEYCHAIN_PATH
-          security set-key-partition-list -S apple-tool:,apple: \
-            -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
           # Add temporary keychain to the search list
           security list-keychains -d user -s $KEYCHAIN_PATH
