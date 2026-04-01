@@ -72,9 +72,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+
       - name: Add upstream
         run: |
           git remote add upstream https://github.com/${{ env.UPSTREAM_REPO }}.git
+          git fetch upstream
 
       - name: Backup our workflow
         run: |
